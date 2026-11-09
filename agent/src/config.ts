@@ -15,7 +15,9 @@ export const config = {
   contract: process.env.FRANCHISE_CONTRACT ?? "",
   keysFile: process.env.OPERATOR_KEYS_FILE ?? ".operators.json",
   masterSeed: process.env.OPERATOR_MASTER_SEED ?? "",
-  llmMode: (process.env.LLM_MODE ?? "auto") as "auto" | "nearai" | "mock",
+  llmMode: (process.env.LLM_MODE ?? "auto") as "auto" | "nearai" | "mock" | "scripted",
+  /** LLM_MODE=scripted: the exact answer to deliver, labelled as scripted (for recordings without AI credits). */
+  scriptedAnswer: process.env.SCRIPTED_ANSWER ?? "",
   nearaiKey: process.env.NEARAI_API_KEY ?? "",
   nearaiModel: process.env.NEARAI_MODEL ?? "Qwen/Qwen3.6-35B-A3B-FP8",
   nearaiBaseUrl: process.env.NEARAI_BASE_URL ?? "https://cloud-api.near.ai/v1",

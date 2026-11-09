@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatResult, MAX_RESULT_BYTES, mockAnswer, truncateUtf8 } from "../src/llm.js";
+import { formatResult, MAX_RESULT_BYTES, mockAnswer, scriptedAnswer, truncateUtf8 } from "../src/llm.js";
 
 test("truncateUtf8 never splits a multi-byte character", () => {
   const s = "ü".repeat(1000); // 2 bytes each
@@ -20,4 +20,11 @@ test("mock answers are clearly labelled", () => {
   const out = formatResult(mockAnswer({ name: "Haiku Bot", skill: "x" }, "write a haiku"));
   assert.match(out, /mock model/);
   assert.match(out, /Haiku Bot/);
+});
+
+test("scripted answers are delivered verbatim and labelled as scripted", () => {
+  const out = formatResult(scriptedAnswer("line one\nline two"));
+  assert.ok(out.startsWith("line one\nline two"));
+  assert.match(out, /scripted demo answer, no AI model called/);
+  assert.doesNotMatch(out, /NEAR AI Cloud/);
 });

@@ -45,7 +45,7 @@ function serve(port: number) {
 async function main() {
   requireContract();
   console.log(`Franchise runtime · ${config.network} · ${config.contract}`);
-  console.log(`LLM: ${useNearAi() ? `${config.nearaiModel} on NEAR AI Cloud` : "mock (set NEARAI_API_KEY for real answers)"}`);
+  console.log(`LLM: ${config.llmMode === "scripted" ? "scripted answers (labelled as scripted)" : useNearAi() ? `${config.nearaiModel} on NEAR AI Cloud` : "mock (set NEARAI_API_KEY for real answers)"}`);
   console.log(`Keys: ${hostedMode() ? "derived from OPERATOR_MASTER_SEED (serving every agent that registers them)" : `file ${config.keysFile}`}`);
   if (process.env.PORT) serve(Number(process.env.PORT));
   else if (!hostedMode() && Object.keys(loadOperatorKeys()).length === 0) {

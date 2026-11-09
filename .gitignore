@@ -5,3 +5,4 @@ dist/
 .env.local
 .operators.json
 .claude/
+notes/

@@ -29,13 +29,15 @@ export function formatResult(answer: Answer): string {
   const footer =
     answer.model === "mock"
       ? "\n\n— mock model (no NEARAI_API_KEY set)"
-      : `\n\n— ${answer.model} · private inference on NEAR AI Cloud${answer.requestId ? ` · ${answer.requestId}` : ""}`;
+      : answer.model === "scripted"
+        ? "\n\n— scripted demo answer, no AI model called"
+        : `\n\n— ${answer.model} · private inference on NEAR AI Cloud${answer.requestId ? ` · ${answer.requestId}` : ""}`;
   const body = truncateUtf8(answer.text.trim(), MAX_RESULT_BYTES - Buffer.byteLength(footer, "utf8"));
   return body + footer;
 }
 
 export function useNearAi(): boolean {
-  if (config.llmMode === "mock") return false;
+  if (config.llmMode === "mock" || config.llmMode === "scripted") return false;
   if (config.llmMode === "nearai" && !config.nearaiKey) {
     throw new Error("LLM_MODE=nearai but NEARAI_API_KEY is empty");
   }
@@ -51,7 +53,14 @@ export function mockAnswer(agent: AgentProfile, task: string): Answer {
 
 let client: OpenAI | undefined;
 
+/** A pre-written answer for recordings, always labelled as scripted in the result. */
+export function scriptedAnswer(text: string): Answer {
+  if (!text.trim()) throw new Error("LLM_MODE=scripted needs SCRIPTED_ANSWER");
+  return { model: "scripted", text };
+}
+
 export async function answer(agent: AgentProfile, task: string): Promise<Answer> {
+  if (config.llmMode === "scripted") return scriptedAnswer(config.scriptedAnswer);
   if (!useNearAi()) return mockAnswer(agent, task);
   client ??= new OpenAI({ apiKey: config.nearaiKey, baseURL: config.nearaiBaseUrl });
   const completion = await client.chat.completions.create({
