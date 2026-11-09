@@ -10,9 +10,9 @@
 import { createServer } from "node:http";
 import { config, requireContract } from "./config.js";
 import { view } from "./chain.js";
-import { ensureOperatorKey, hostedMode, operatedTokens, secretFor } from "./keys.js";
+import { ensureOperatorKey, hostedMode, loadOperatorKeys, secretFor } from "./keys.js";
 import { useNearAi } from "./llm.js";
-import { log, tick } from "./runtime.js";
+import { pollWork } from "./runtime.js";
 
 /**
  * Optional HTTP endpoint so holders can "hire" this hosted runtime from the web app:
@@ -46,21 +46,19 @@ async function main() {
   requireContract();
   console.log(`Franchise runtime · ${config.network} · ${config.contract}`);
   console.log(`LLM: ${useNearAi() ? `${config.nearaiModel} on NEAR AI Cloud` : "mock (set NEARAI_API_KEY for real answers)"}`);
-  console.log(`Keys: ${hostedMode() ? "derived from OPERATOR_MASTER_SEED (operating every agent that registers them)" : `file ${config.keysFile}`}`);
+  console.log(`Keys: ${hostedMode() ? "derived from OPERATOR_MASTER_SEED (serving every agent that registers them)" : `file ${config.keysFile}`}`);
   if (process.env.PORT) serve(Number(process.env.PORT));
-  else if ((await operatedTokens()).length === 0) {
+  else if (!hostedMode() && Object.keys(loadOperatorKeys()).length === 0) {
     console.error(`No operator keys in ${config.keysFile}. Run: npm run keygen -- <token_id>, or set PORT to serve keys to the web app.`);
     process.exit(1);
   }
 
+  // One get_open_work call per poll, however many agents there are.
   for (;;) {
     try {
-      const tokens = await operatedTokens();
-      await Promise.all(
-        tokens.map((t) => tick(t, secretFor(t)!).catch((e) => log(t, `error: ${(e as Error).message.split("\n")[0]}`))),
-      );
+      await pollWork(secretFor);
     } catch (e) {
-      console.error(`poll failed: ${(e as Error).message.split("\n")[0]}`);
+      console.error(`${new Date().toISOString().slice(11, 19)}  poll failed: ${(e as Error).message.split("\n")[0]}`);
     }
     await new Promise((r) => setTimeout(r, config.pollMs));
   }

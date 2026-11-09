@@ -1,13 +1,18 @@
 /**
- * One polling step for one agent: check the operator key is still live, then answer
- * and deliver every open job. Shared by the long-running worker and the local demo.
+ * Polling and delivery, shared by the long-running worker and the local demo.
+ *
+ * The worker uses `pollWork`: one `get_open_work` call per poll returns every open job
+ * across all agents, so the RPC load doesn't grow with the number of agents. The vault's
+ * access key is only checked when an agent actually has work (and cached per epoch).
  */
 import { vaultAccountFor } from "./config.js";
-import { type AgentView, type JobView, keyIsActive, operatorAccount, view } from "./chain.js";
+import { type AgentView, type JobView, type WorkItem, keyIsActive, operatorAccount, view } from "./chain.js";
 import { answer, formatResult } from "./llm.js";
 
 const inFlight = new Set<number>();
 const lastStatus = new Map<string, string>();
+const keyCache = new Map<string, { epoch: number; active: boolean; at: number }>();
+const KEY_CACHE_MS = 60_000;
 
 export function log(tokenId: string, msg: string) {
   console.log(`${new Date().toISOString().slice(11, 19)}  agent #${tokenId}  ${msg}`);
@@ -20,16 +25,66 @@ function status(tokenId: string, msg: string) {
   log(tokenId, msg);
 }
 
-/** Returns the number of jobs delivered in this step. */
+async function operatorKeyActive(agent: AgentView, secretKey: string): Promise<boolean> {
+  const cached = keyCache.get(agent.token_id);
+  if (cached && cached.epoch === agent.epoch && Date.now() - cached.at < KEY_CACHE_MS) return cached.active;
+  const active = await keyIsActive(vaultAccountFor(agent.token_id), secretKey);
+  keyCache.set(agent.token_id, { epoch: agent.epoch, active, at: Date.now() });
+  return active;
+}
+
+/** Answer one job and deliver it by signing complete_job as the vault. Returns 1 if paid. */
+async function deliver(agent: AgentView, job: JobView, secretKey: string): Promise<number> {
+  if (inFlight.has(job.id)) return 0;
+  inFlight.add(job.id);
+  const vault = vaultAccountFor(agent.token_id);
+  try {
+    log(agent.token_id, `job ${job.id} from ${job.client}: "${job.task.slice(0, 80)}"`);
+    const result = formatResult(await answer(agent, job.task));
+    await operatorAccount(vault, secretKey).callFunction({
+      contractId: vault,
+      methodName: "complete_job",
+      args: { job_id: job.id, result },
+      gas: 100_000_000_000_000n,
+    });
+    log(agent.token_id, `job ${job.id} delivered and paid`);
+    return 1;
+  } catch (err) {
+    keyCache.delete(agent.token_id); // the key may have been revoked by a sale
+    log(agent.token_id, `job ${job.id} failed: ${(err as Error).message.split("\n")[0]}`);
+    return 0;
+  } finally {
+    inFlight.delete(job.id);
+  }
+}
+
+/** One poll for every agent this runtime holds a key for. Returns the number of jobs delivered. */
+export async function pollWork(secretFor: (tokenId: string) => string | undefined): Promise<number> {
+  const work = await view<WorkItem[]>("get_open_work", { limit: 20 });
+  let delivered = 0;
+  for (const { job, agent } of work) {
+    const secret = secretFor(agent.token_id);
+    if (!secret) continue;
+    if (!(await operatorKeyActive(agent, secret))) {
+      status(agent.token_id, `has open jobs, but this runtime's key isn't registered on ${vaultAccountFor(agent.token_id)}`);
+      continue;
+    }
+    status(agent.token_id, `online · holder ${agent.owner}`);
+    delivered += await deliver(agent, job, secret);
+  }
+  return delivered;
+}
+
+/** Check and serve a single agent (used by the local demo to narrate each step). */
 export async function tick(tokenId: string, secretKey: string): Promise<number> {
   const agent = await view<AgentView | null>("get_agent", { token_id: tokenId });
   if (!agent) {
     status(tokenId, "no such agent on this contract");
     return 0;
   }
-  const vault = vaultAccountFor(tokenId);
-  if (!(await keyIsActive(vault, secretKey))) {
-    status(tokenId, `operator key not active on ${vault}: the holder (${agent.owner}) has not registered it, or the NFT changed hands`);
+  keyCache.delete(tokenId);
+  if (!(await operatorKeyActive(agent, secretKey))) {
+    status(tokenId, `operator key not active on ${vaultAccountFor(tokenId)}: the holder (${agent.owner}) has not registered it, or the NFT changed hands`);
     return 0;
   }
   if (agent.paused) {
@@ -37,28 +92,7 @@ export async function tick(tokenId: string, secretKey: string): Promise<number> 
     return 0;
   }
   status(tokenId, `online · holder ${agent.owner} · ${agent.jobs_completed} jobs done`);
-
   let delivered = 0;
-  const jobs = await view<JobView[]>("get_open_jobs", { token_id: tokenId });
-  for (const job of jobs) {
-    if (inFlight.has(job.id)) continue;
-    inFlight.add(job.id);
-    try {
-      log(tokenId, `job ${job.id} from ${job.client}: "${job.task.slice(0, 80)}"`);
-      const result = formatResult(await answer(agent, job.task));
-      await operatorAccount(vault, secretKey).callFunction({
-        contractId: vault,
-        methodName: "complete_job",
-        args: { job_id: job.id, result },
-        gas: 100_000_000_000_000n,
-      });
-      delivered++;
-      log(tokenId, `job ${job.id} delivered and paid`);
-    } catch (err) {
-      log(tokenId, `job ${job.id} failed: ${(err as Error).message.split("\n")[0]}`);
-    } finally {
-      inFlight.delete(job.id);
-    }
-  }
+  for (const job of await view<JobView[]>("get_open_jobs", { token_id: tokenId })) delivered += await deliver(agent, job, secretKey);
   return delivered;
 }

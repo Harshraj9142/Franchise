@@ -11,6 +11,7 @@ export const config = {
   rpcUrl:
     process.env.NEAR_RPC_URL ??
     (network === "mainnet" ? "https://free.rpc.fastnear.com" : "https://test.rpc.fastnear.com"),
+  fallbackRpcUrl: network === "mainnet" ? "https://rpc.mainnet.near.org" : "https://rpc.testnet.near.org",
   contract: process.env.FRANCHISE_CONTRACT ?? "",
   keysFile: process.env.OPERATOR_KEYS_FILE ?? ".operators.json",
   masterSeed: process.env.OPERATOR_MASTER_SEED ?? "",

@@ -2,22 +2,19 @@ import { useState } from "react";
 import { Avatar } from "../Avatar";
 import { usePoll } from "../hooks";
 import { bytes, near, short, toYocto } from "../format";
-import { view, type Agent, type Config, type Job } from "../rpc";
+import { view, type Agent, type Config, type MarketView } from "../rpc";
 import { call, signIn, useAccount } from "../wallet";
 import { Action, AccountLink } from "../ui";
 
 export function Market() {
+  // One RPC call per refresh: public RPCs allow roughly one request per second per visitor.
   const { data } = usePoll(
     async () => {
-      const [agents, config, recent] = await Promise.all([
-        view<Agent[]>("list_agents", { limit: 100 }),
-        view<Config>("get_config"),
-        view<Job[]>("get_recent_jobs", { limit: 6 }),
-      ]);
-      return { agents, config, recent };
+      const m = await view<MarketView>("get_market", { limit: 100, recent: 6 });
+      return { agents: m.agents, config: m.config, recent: m.recent_jobs };
     },
     [],
-    5000,
+    6000,
   );
   const agents = data?.agents ?? [];
   const earned = agents.reduce((s, a) => s + BigInt(a.total_earned), 0n);

@@ -6,10 +6,16 @@ let preferred = 0;
  * JSON-RPC with failover: if an endpoint is unreachable, blocked or rate-limited,
  * the next one is tried and remembered. Contract errors are returned as-is.
  */
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function rpc<T>(method: string, params: unknown): Promise<T> {
   const payload = JSON.stringify({ jsonrpc: "2.0", id: "franchise", method, params });
   let lastError: unknown;
-  for (let i = 0; i < RPC_URLS.length; i++) {
+  // Public RPCs rate-limit per IP (and answer 429 without CORS headers, which shows up as a
+  // network error). Cycle through the endpoints with a short backoff before giving up.
+  const attempts = RPC_URLS.length * 2;
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0) await pause(400 * i);
     const idx = (preferred + i) % RPC_URLS.length;
     let body;
     try {
@@ -104,6 +110,19 @@ export interface Config {
   job_timeout_sec: number;
   total_agents: number;
   total_jobs: number;
+}
+
+export interface MarketView {
+  config: Config;
+  agents: Agent[];
+  recent_jobs: Job[];
+}
+
+export interface AgentPageView {
+  config: Config;
+  agent: Agent;
+  jobs: Job[];
+  history: HistoryEntry[];
 }
 
 export interface VaultState {

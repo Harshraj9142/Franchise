@@ -2,6 +2,7 @@
 use crate::*;
 
 #[near(serializers = [json])]
+#[derive(Clone)]
 pub struct AgentView {
     pub token_id: TokenId,
     pub name: String,
@@ -195,3 +196,80 @@ impl Contract {
             .collect()
     }
 }
+
+// ---------------------------------------------------------------------------
+// Combined views: one RPC call per screen, so public RPC rate limits aren't hit.
+
+#[near(serializers = [json])]
+pub struct MarketView {
+    pub config: ConfigView,
+    pub agents: Vec<AgentView>,
+    pub recent_jobs: Vec<JobView>,
+}
+
+#[near(serializers = [json])]
+pub struct AgentPageView {
+    pub config: ConfigView,
+    pub agent: AgentView,
+    pub jobs: Vec<JobView>,
+    pub history: Vec<HistoryView>,
+}
+
+#[near(serializers = [json])]
+pub struct WorkItem {
+    pub job: JobView,
+    pub agent: AgentView,
+}
+
+#[near]
+impl Contract {
+    /// Everything the market page shows, in one call.
+    pub fn get_market(&self, limit: Option<u32>, recent: Option<u32>) -> MarketView {
+        MarketView {
+            config: self.get_config(),
+            agents: self.list_agents(None, Some(limit.unwrap_or(100))),
+            recent_jobs: self.get_recent_jobs(Some(recent.unwrap_or(6))),
+        }
+    }
+
+    /// Everything an agent's page shows (except its vault's own state), in one call.
+    pub fn get_agent_page(&self, token_id: TokenId, jobs_limit: Option<u32>, history_limit: Option<u32>) -> Option<AgentPageView> {
+        let agent = self.get_agent(token_id.clone())?;
+        Some(AgentPageView {
+            config: self.get_config(),
+            agent,
+            jobs: self.get_jobs(token_id.clone(), None, Some(jobs_limit.unwrap_or(20))),
+            history: self.get_history(token_id, None, Some(history_limit.unwrap_or(40))),
+        })
+    }
+
+    /// Open jobs across all unpaused agents, oldest first, each with its agent.
+    /// Lets one runtime serve every agent with a single call per poll.
+    pub fn get_open_work(&self, limit: Option<u32>) -> Vec<WorkItem> {
+        let limit = limit.unwrap_or(50) as usize;
+        let mut items: Vec<WorkItem> = vec![];
+        for (token_id, a) in self.agents.iter() {
+            if a.paused {
+                continue;
+            }
+            let open: Vec<JobView> = a
+                .job_ids
+                .iter()
+                .filter_map(|id| self.jobs.get(*id as u32))
+                .filter(|j| j.status == JobStatus::Open)
+                .map(Self::job_view)
+                .collect();
+            if open.is_empty() {
+                continue;
+            }
+            let agent = self.agent_view(token_id, a);
+            for job in open {
+                items.push(WorkItem { job, agent: agent.clone() });
+            }
+        }
+        items.sort_by_key(|w| w.job.id);
+        items.truncate(limit);
+        items
+    }
+}
+

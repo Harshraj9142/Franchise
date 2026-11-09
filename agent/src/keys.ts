@@ -2,7 +2,6 @@ import { createHmac, createPrivateKey, createPublicKey } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { baseEncode, KeyPair, type KeyPairString } from "near-api-js";
 import { config } from "./config.js";
-import { view } from "./chain.js";
 
 /**
  * Operator keys come from one of two places:
@@ -47,15 +46,4 @@ export function ensureOperatorKey(tokenId: string): string {
     writeFileSync(config.keysFile, JSON.stringify(keys, null, 2) + "\n", { mode: 0o600 });
   }
   return KeyPair.fromString(secret as KeyPairString).getPublicKey().toString();
-}
-
-/** The agents this runtime should look after: all of them in hosted mode, else those in the keys file. */
-export async function operatedTokens(): Promise<string[]> {
-  if (!hostedMode()) return Object.keys(loadOperatorKeys());
-  const ids: string[] = [];
-  for (let from = 0; ; from += 100) {
-    const page = await view<{ token_id: string }[]>("list_agents", { from_index: from, limit: 100 });
-    ids.push(...page.map((a) => a.token_id));
-    if (page.length < 100) return ids;
-  }
 }

@@ -365,3 +365,47 @@ async fn vault_rejects_direct_calls() -> anyhow::Result<()> {
     assert_fails_with(&t, "only the franchise contract");
     Ok(())
 }
+
+#[tokio::test]
+async fn combined_views_match_individual_views() -> anyhow::Result<()> {
+    let env = setup().await?;
+    let a = env.mint(&env.creator, "Agent A", 100).await?;
+    let b = env.mint(&env.creator, "Agent B", 100).await?;
+    let op_a = env.set_operator(&env.creator, &a).await?;
+    env.set_operator(&env.creator, &b).await?;
+    let done = env.hire(&env.client, &a, "first").await?;
+    env.complete(&op_a, done, "ok").await?.into_result()?;
+    let open_b = env.hire(&env.client, &b, "for B").await?;
+    let open_a = env.hire(&env.client, &a, "second for A").await?;
+
+    let market = env.view("get_market", json!({})).await?;
+    assert_eq!(market["agents"], env.view("list_agents", json!({})).await?);
+    assert_eq!(market["config"], env.view("get_config", json!({})).await?);
+    assert_eq!(market["recent_jobs"].as_array().unwrap().len(), 3);
+
+    let page = env.view("get_agent_page", json!({ "token_id": a })).await?;
+    assert_eq!(page["agent"], env.agent(&a).await?);
+    assert_eq!(page["jobs"], env.view("get_jobs", json!({ "token_id": a })).await?);
+    assert_eq!(page["history"], env.view("get_history", json!({ "token_id": a })).await?);
+    assert!(env.view("get_agent_page", json!({ "token_id": "999" })).await?.is_null());
+
+    // Open work across all agents, oldest first, each carrying its agent.
+    let work = env.view("get_open_work", json!({})).await?;
+    let ids: Vec<u64> = work.as_array().unwrap().iter().map(|w| w["job"]["id"].as_u64().unwrap()).collect();
+    assert_eq!(ids, vec![open_b, open_a]);
+    assert_eq!(work[0]["agent"]["token_id"], b);
+
+    // A paused agent's jobs are not offered as work.
+    env.creator
+        .call(env.id(), "set_paused")
+        .args_json(json!({ "token_id": b, "paused": true }))
+        .deposit(NearToken::from_yoctonear(1))
+        .gas(Gas::from_tgas(50))
+        .transact()
+        .await?
+        .into_result()?;
+    let work = env.view("get_open_work", json!({})).await?;
+    assert_eq!(work.as_array().unwrap().len(), 1);
+    assert_eq!(work[0]["job"]["id"], open_a);
+    Ok(())
+}

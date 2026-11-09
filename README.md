@@ -18,7 +18,7 @@ Requirements: Rust (the repo pins 1.95 via `rust-toolchain.toml`), [cargo-near](
 
 ```bash
 ./scripts/build.sh                     # builds res/vault.wasm and res/franchise.wasm
-cargo test                             # 14 unit tests + 12 tests on a local NEAR sandbox
+cargo test                             # 14 unit tests + 13 tests on a local NEAR sandbox
 cd agent && npm install && npm run demo:local
 ```
 
@@ -139,7 +139,7 @@ On testnet the deployer keeps a full-access key on `franchise.<name>.testnet` so
 | --- | --- |
 | `contracts/franchise` | NFT contract, job escrow, royalties, holder controls, views (`src/lib.rs`, `src/views.rs`), unit tests (`src/tests.rs`) |
 | `contracts/vault` | The contract on each agent's own account, with its unit tests |
-| `integration-tests/tests/franchise.rs` | 12 end-to-end tests on a local NEAR sandbox, one per threat |
+| `integration-tests/tests/franchise.rs` | 13 end-to-end tests on a local NEAR sandbox, one per threat plus the combined views |
 | `agent/` | TypeScript runtime: `npm start` (worker), `npm run keygen`, `npm run hire-agent`, `npm run demo:local`, `npm test`; `Dockerfile` for hosting |
 | `web/` | Vite + React app: market, agent pages, owner panel |
 | `scripts/` | `build.sh`, `deploy-testnet.sh` |
@@ -149,7 +149,8 @@ On testnet the deployer keeps a full-access key on `franchise.<name>.testnet` so
 ## Known limitations
 
 - Creating an agent costs about 1.8 NEAR on testnet, mostly storage for the 143 KB vault code on the agent's own account. Global contracts (above) remove most of that.
-- History and job lists are stored in the contract and grow with use. A production version would index NEP-297 events instead.
+- History and job lists are stored in the contract and grow with use. `get_open_work` scans every agent's jobs, which is fine at hackathon scale. A production version would index NEP-297 events instead.
+- Public RPCs rate-limit per IP (FastNEAR allowed about 1 request per second in testing). The web app uses one combined view per screen (`get_market`, `get_agent_page`) and falls back to NEAR's public RPC. The runtime makes one `get_open_work` call per poll, however many agents it serves.
 - `hire_agent` is triggered by the operator, not decided autonomously from task text, to avoid prompt-injected spending.
 - A seller can spend up to the daily `hire_agent` cap just before a sale. Buyers can see every hire in the history.
 

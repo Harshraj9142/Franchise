@@ -3,7 +3,7 @@ import { Avatar } from "../Avatar";
 import { RUNTIME_URL } from "../config";
 import { ago, bytes, near, toYocto } from "../format";
 import { usePoll } from "../hooks";
-import { accessKeys, view, type AccessKey, type Agent, type Config, type HistoryEntry, type Job, type VaultState } from "../rpc";
+import { accessKeys, view, type AccessKey, type Agent, type AgentPageView, type Config, type HistoryEntry, type Job, type VaultState } from "../rpc";
 import { AccountLink, Action } from "../ui";
 import { call, signIn, useAccount } from "../wallet";
 import { StatusPill } from "./Market";
@@ -12,19 +12,15 @@ export function AgentPage({ tokenId }: { tokenId: string }) {
   const account = useAccount();
   const { data, error, refresh } = usePoll(
     async () => {
-      const agent = await view<Agent | null>("get_agent", { token_id: tokenId });
-      if (!agent) return null;
-      const [vault, keys, jobs, history, config] = await Promise.all([
-        view<VaultState>("get_state", {}, agent.vault),
-        accessKeys(agent.vault),
-        view<Job[]>("get_jobs", { token_id: tokenId, limit: 20 }),
-        view<HistoryEntry[]>("get_history", { token_id: tokenId, limit: 40 }),
-        view<Config>("get_config"),
-      ]);
-      return { agent, vault, keys, jobs, history, config };
+      // Three RPC calls per refresh: the agent page from the franchise contract, plus the
+      // vault's own state and keys, which live on the agent's account.
+      const page = await view<AgentPageView | null>("get_agent_page", { token_id: tokenId, jobs_limit: 20, history_limit: 40 });
+      if (!page) return null;
+      const [vault, keys] = await Promise.all([view<VaultState>("get_state", {}, page.agent.vault), accessKeys(page.agent.vault)]);
+      return { ...page, vault, keys };
     },
     [tokenId],
-    5000,
+    6000,
   );
 
   if (error && !data) return <p className="error">Could not load agent #{tokenId}: {error}</p>;

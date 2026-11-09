@@ -1,7 +1,12 @@
-import { Account, JsonRpcProvider, KeyPair, type KeyPairString } from "near-api-js";
+import { Account, FailoverRpcProvider, JsonRpcProvider, KeyPair, type KeyPairString } from "near-api-js";
 import { config } from "./config.js";
 
-export const provider = new JsonRpcProvider({ url: config.rpcUrl });
+/** The configured RPC first, then NEAR's public RPC if it is down or rate-limiting. */
+export const provider = new FailoverRpcProvider(
+  [config.rpcUrl, ...(config.rpcUrl.includes("127.0.0.1") || config.rpcUrl.includes("localhost") ? [] : [config.fallbackRpcUrl])].map(
+    (url) => new JsonRpcProvider({ url }),
+  ),
+);
 
 export async function view<T>(method: string, args: Record<string, unknown> = {}, contractId = config.contract): Promise<T> {
   return (await provider.callFunction<T & object>({ contractId, method, args, blockQuery: { finality: "optimistic" } })) as T;
@@ -23,6 +28,11 @@ export interface AgentView {
   total_earned: string;
 }
 
+export interface WorkItem {
+  job: JobView;
+  agent: AgentView;
+}
+
 export interface JobView {
   id: number;
   token_id: string;
@@ -42,12 +52,10 @@ export function publicKeyOf(secretKey: string): string {
   return KeyPair.fromString(secretKey as KeyPairString).getPublicKey().toString();
 }
 
-/** False once the holder sold the NFT: the vault deleted the key. */
+/** False once the holder sold the NFT: the vault deleted the key. Lists keys rather than
+ *  querying one, so a missing key is a normal answer instead of an RPC error. */
 export async function keyIsActive(vault: string, secretKey: string): Promise<boolean> {
-  try {
-    await provider.viewAccessKey({ accountId: vault, publicKey: publicKeyOf(secretKey), finalityQuery: { finality: "optimistic" } });
-    return true;
-  } catch {
-    return false;
-  }
+  const wanted = publicKeyOf(secretKey);
+  const list = await provider.viewAccessKeyList({ accountId: vault, finalityQuery: { finality: "optimistic" } });
+  return list.keys.some((k) => k.public_key.toString() === wanted);
 }
