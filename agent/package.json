@@ -1,0 +1,29 @@
+{
+  "name": "franchise-agent",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "start": "tsx src/worker.ts",
+    "keygen": "tsx src/keygen.ts",
+    "hire-agent": "tsx src/hire-agent.ts",
+    "typecheck": "tsc",
+    "demo:local": "tsx src/local-demo.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "private": "true",
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "near-sandbox": "^0.3.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "near-api-js": "^7.4.0",
+    "openai": "^7.53.0"
+  }
+}
