@@ -21,6 +21,9 @@ export const config = {
   nearaiKey: process.env.NEARAI_API_KEY ?? "",
   nearaiModel: process.env.NEARAI_MODEL ?? "Qwen/Qwen3.6-35B-A3B-FP8",
   nearaiBaseUrl: process.env.NEARAI_BASE_URL ?? "https://cloud-api.near.ai/v1",
+  /** Reasoning models can spend the whole token budget thinking and return no answer.
+   *  "none" turns thinking off; set NEARAI_REASONING="" to send nothing. */
+  nearaiReasoning: process.env.NEARAI_REASONING ?? "none",
   pollMs: Number(process.env.POLL_MS ?? 4000),
 };
 

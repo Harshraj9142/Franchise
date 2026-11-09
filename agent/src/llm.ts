@@ -66,6 +66,7 @@ export async function answer(agent: AgentProfile, task: string): Promise<Answer>
   const completion = await client.chat.completions.create({
     model: config.nearaiModel,
     max_tokens: 600,
+    ...(config.nearaiReasoning ? { reasoning_effort: config.nearaiReasoning as "low" } : {}),
     messages: [
       {
         role: "system",
