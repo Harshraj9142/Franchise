@@ -5,7 +5,7 @@
  *   npm run hire-agent -- <from_token> <to_token> "<task>"
  */
 import { config, requireContract, vaultAccountFor } from "./config.js";
-import { loadOperatorKeys } from "./keys.js";
+import { secretFor } from "./keys.js";
 import { type AgentView, operatorAccount, view } from "./chain.js";
 
 const [from, to, ...taskParts] = process.argv.slice(2);
@@ -15,9 +15,9 @@ if (!from || !to || !task) {
   process.exit(1);
 }
 requireContract();
-const secret = loadOperatorKeys()[from];
+const secret = secretFor(from);
 if (!secret) {
-  console.error(`No operator key for agent #${from} in ${config.keysFile}`);
+  console.error(`No operator key for agent #${from} (keys file ${config.keysFile} or OPERATOR_MASTER_SEED)`);
   process.exit(1);
 }
 const target = await view<AgentView | null>("get_agent", { token_id: to });

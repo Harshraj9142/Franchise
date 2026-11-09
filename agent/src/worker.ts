@@ -10,7 +10,7 @@
 import { createServer } from "node:http";
 import { config, requireContract } from "./config.js";
 import { view } from "./chain.js";
-import { ensureOperatorKey, loadOperatorKeys } from "./keys.js";
+import { ensureOperatorKey, hostedMode, operatedTokens, secretFor } from "./keys.js";
 import { useNearAi } from "./llm.js";
 import { log, tick } from "./runtime.js";
 
@@ -46,18 +46,22 @@ async function main() {
   requireContract();
   console.log(`Franchise runtime · ${config.network} · ${config.contract}`);
   console.log(`LLM: ${useNearAi() ? `${config.nearaiModel} on NEAR AI Cloud` : "mock (set NEARAI_API_KEY for real answers)"}`);
+  console.log(`Keys: ${hostedMode() ? "derived from OPERATOR_MASTER_SEED (operating every agent that registers them)" : `file ${config.keysFile}`}`);
   if (process.env.PORT) serve(Number(process.env.PORT));
-  else if (Object.keys(loadOperatorKeys()).length === 0) {
+  else if ((await operatedTokens()).length === 0) {
     console.error(`No operator keys in ${config.keysFile}. Run: npm run keygen -- <token_id>, or set PORT to serve keys to the web app.`);
     process.exit(1);
   }
 
   for (;;) {
-    const keys = loadOperatorKeys();
-    const tokens = Object.keys(keys);
-    await Promise.all(
-      tokens.map((t) => tick(t, keys[t]).catch((e) => log(t, `error: ${(e as Error).message.split("\n")[0]}`))),
-    );
+    try {
+      const tokens = await operatedTokens();
+      await Promise.all(
+        tokens.map((t) => tick(t, secretFor(t)!).catch((e) => log(t, `error: ${(e as Error).message.split("\n")[0]}`))),
+      );
+    } catch (e) {
+      console.error(`poll failed: ${(e as Error).message.split("\n")[0]}`);
+    }
     await new Promise((r) => setTimeout(r, config.pollMs));
   }
 }

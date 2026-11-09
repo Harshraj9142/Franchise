@@ -1,0 +1,46 @@
+# Runs every test on each push: contract unit tests, sandbox integration tests, runtime tests.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries for cargo-near
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Install cargo-near
+        run: command -v cargo-near || cargo install --locked cargo-near@0.20.3
+      - name: Build contracts
+        run: ./scripts/build.sh
+      - name: Unit and sandbox tests
+        run: cargo test
+
+  agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: agent/package-lock.json
+      - run: npm ci
+      - run: npx tsc
+      - run: npm test

@@ -4,7 +4,8 @@ Franchise turns an AI agent into an asset you can own and sell. Each NFT is tied
 
 Built at NEAR HACKATHON (November 2026). Tracks: NFTs That Do Something, Agent Economy, Autonomous Business.
 
-- Live demo: _add the hosted URL here_
+- Live demo: https://harshraj9142.github.io/Franchise/ (NEAR testnet)
+- Contract: [`franchise.harshraj9142.testnet`](https://testnet.nearblocks.io/address/franchise.harshraj9142.testnet)
 - Demo video: _add the X post link here_
 
 ## The problem
@@ -86,13 +87,13 @@ The exact rules are in [RULES.md](RULES.md). Every attack a seller could try, wi
 
 ## Run it on testnet
 
-You need a testnet account with about 10 NEAR in [near-cli-rs](https://github.com/near/near-cli-rs)'s keychain. Create one with `near account create-account sponsor-by-faucet-service <name>.testnet autogenerate-new-keypair save-to-keychain network-config testnet create`.
+You need a testnet account with about 10 NEAR in [near-cli-rs](https://github.com/near/near-cli-rs)'s key store (`~/.near-credentials`). Create one with `near account create-account sponsor-by-faucet-service <name>.testnet autogenerate-new-keypair --signature-scheme ed25519 save-to-legacy-keychain network-config testnet create`.
 
 ```bash
 ./scripts/deploy-testnet.sh <name>.testnet            # deploys franchise.<name>.testnet
 ```
 
-**Agent runtime** (keep it running; it answers jobs for every agent whose holder activated it):
+**Agent runtime, locally** (it answers jobs for every agent whose holder activated it):
 
 ```bash
 cd agent
@@ -100,15 +101,25 @@ cp .env.example .env      # set FRANCHISE_CONTRACT, NEARAI_API_KEY (optional), P
 npm start
 ```
 
-With `PORT` set, the runtime serves `GET /operator/<token_id>`, which returns the public key a holder should register. Its secret keys stay in `.operators.json`, which is git-ignored. Without `PORT`, create keys with `npm run keygen -- <token_id>` and register the printed key.
+With `PORT` set, the runtime serves `GET /operator/<token_id>`, which returns the public key a holder should register. Without `PORT`, create keys with `npm run keygen -- <token_id>` and register the printed key.
 
-**Web app:**
+Where the runtime's keys live:
+- **Local mode:** random keys in `.operators.json`, which is git-ignored.
+- **Hosted mode:** set `OPERATOR_MASTER_SEED` (generate it with `openssl rand -hex 32`). Every agent's key is then derived from that one secret with HMAC-SHA256, so the runtime keeps no files and survives restarts.
 
-```bash
-cd web
-cp .env.example .env      # set VITE_CONTRACT, and VITE_RUNTIME_URL to the runtime's public URL
-npm run build             # static site in web/dist, deployable to any static host
-```
+**Agent runtime, hosted.** `agent/Dockerfile` runs on any container host that keeps a process running. A free tier that sleeps when idle, like Render's free plan, would stop answering jobs. On Railway:
+
+1. New Project → Deploy from GitHub repo → this repo, with **Root Directory** set to `agent`.
+2. Add variables: `NEAR_NETWORK=testnet`, `FRANCHISE_CONTRACT=franchise.<name>.testnet`, `OPERATOR_MASTER_SEED`, and optionally `NEARAI_API_KEY`.
+3. Networking → Generate Domain. Check that `https://<domain>/health` answers `ok`.
+
+**Web app.** `.github/workflows/pages.yml` builds `web/` and publishes it to GitHub Pages on every push to `main`:
+
+1. Repository Settings → Pages → Source: **GitHub Actions**.
+2. Settings → Secrets and variables → Actions → Variables: set `VITE_CONTRACT`, and `VITE_RUNTIME_URL` to the runtime's public URL.
+3. Re-run the "Deploy web app" workflow.
+
+To build it yourself: `cd web && cp .env.example .env && npm run build`. The static site lands in `web/dist`.
 
 Then in the browser:
 
@@ -129,9 +140,10 @@ On testnet the deployer keeps a full-access key on `franchise.<name>.testnet` so
 | `contracts/franchise` | NFT contract, job escrow, royalties, holder controls, views (`src/lib.rs`, `src/views.rs`), unit tests (`src/tests.rs`) |
 | `contracts/vault` | The contract on each agent's own account, with its unit tests |
 | `integration-tests/tests/franchise.rs` | 12 end-to-end tests on a local NEAR sandbox, one per threat |
-| `agent/` | TypeScript runtime: `npm start` (worker), `npm run keygen`, `npm run hire-agent`, `npm run demo:local`, `npm test` |
+| `agent/` | TypeScript runtime: `npm start` (worker), `npm run keygen`, `npm run hire-agent`, `npm run demo:local`, `npm test`; `Dockerfile` for hosting |
 | `web/` | Vite + React app: market, agent pages, owner panel |
 | `scripts/` | `build.sh`, `deploy-testnet.sh` |
+| `.github/workflows/` | `test.yml` runs every test on each push; `pages.yml` publishes the web app |
 | `res/` | Built wasm. `vault.wasm` is embedded into `franchise.wasm` at build time. |
 
 ## Known limitations

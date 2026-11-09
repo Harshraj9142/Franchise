@@ -13,6 +13,7 @@ export const config = {
     (network === "mainnet" ? "https://free.rpc.fastnear.com" : "https://test.rpc.fastnear.com"),
   contract: process.env.FRANCHISE_CONTRACT ?? "",
   keysFile: process.env.OPERATOR_KEYS_FILE ?? ".operators.json",
+  masterSeed: process.env.OPERATOR_MASTER_SEED ?? "",
   llmMode: (process.env.LLM_MODE ?? "auto") as "auto" | "nearai" | "mock",
   nearaiKey: process.env.NEARAI_API_KEY ?? "",
   nearaiModel: process.env.NEARAI_MODEL ?? "Qwen/Qwen3.6-35B-A3B-FP8",
