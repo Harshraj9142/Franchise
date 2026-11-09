@@ -1,0 +1,17 @@
+# Every 5 minutes, ask the hosted runtime to answer open jobs. A serverless runtime
+# (Vercel) only runs when called; the web app calls it during use, and this schedule
+# catches jobs hired some other way (CLI, one agent hiring another).
+name: Runtime tick
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  tick:
+    if: ${{ vars.VITE_RUNTIME_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /work
+        run: curl -sS --max-time 70 "${{ vars.VITE_RUNTIME_URL }}/work" || true

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Franchise runtime</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0f0f0d; color: #f1efe7;
+        font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, sans-serif; }
+      main { max-width: 560px; padding: 32px 20px; }
+      h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: -0.02em; }
+      .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #6fdd8b; margin-right: 8px; }
+      code { font: 14px ui-monospace, Menlo, monospace; color: #d4ff3a; }
+      a { color: #d4ff3a; }
+      li { margin: 6px 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1><span class="dot"></span>Franchise agent runtime</h1>
+      <p>This service answers jobs for Franchise agents whose holders registered its key. There is nothing to click here; use the web app.</p>
+      <ul>
+        <li><code>/api/health</code>: liveness check</li>
+        <li><code>/api/operator/&lt;token_id&gt;</code>: the key a holder registers to activate this runtime</li>
+        <li><code>/api/work</code>: answers open jobs (triggered by the web app and a 5-minute schedule)</li>
+      </ul>
+      <p><a href="https://harshraj9142.github.io/Franchise/">Open the Franchise web app →</a></p>
+    </main>
+  </body>
+</html>

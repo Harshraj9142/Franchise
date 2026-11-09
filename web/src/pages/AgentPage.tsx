@@ -5,6 +5,7 @@ import { ago, bytes, near, toYocto } from "../format";
 import { usePoll } from "../hooks";
 import { accessKeys, view, type AccessKey, type Agent, type AgentPageView, type Config, type HistoryEntry, type Job, type VaultState } from "../rpc";
 import { AccountLink, Action } from "../ui";
+import { nudgeRuntime } from "../runtime";
 import { call, signIn, useAccount } from "../wallet";
 import { StatusPill } from "./Market";
 
@@ -16,6 +17,7 @@ export function AgentPage({ tokenId }: { tokenId: string }) {
       // vault's own state and keys, which live on the agent's account.
       const page = await view<AgentPageView | null>("get_agent_page", { token_id: tokenId, jobs_limit: 20, history_limit: 40 });
       if (!page) return null;
+      if (page.jobs.some((j) => j.status === "Open")) nudgeRuntime();
       const [vault, keys] = await Promise.all([view<VaultState>("get_state", {}, page.agent.vault), accessKeys(page.agent.vault)]);
       return { ...page, vault, keys };
     },
@@ -141,6 +143,7 @@ function Hire({ agent, config, onDone }: { agent: Agent; config: Config; onDone:
             disabled={!available || !task.trim() || bytes(task) > 500}
             run={async () => {
               const r = await call("hire", { token_id: agent.token_id, task: task.trim() }, cost, 50);
+              nudgeRuntime(true);
               setTask("");
               onDone();
               return r.txHash;

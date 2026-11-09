@@ -77,9 +77,10 @@ async function deliver(agent: AgentView, job: JobView, secretKey: string): Promi
   }
 }
 
-/** One poll for every agent this runtime holds a key for. Returns the number of jobs delivered. */
-export async function pollWork(secretFor: (tokenId: string) => string | undefined): Promise<number> {
-  const work = await view<WorkItem[]>("get_open_work", { limit: 20 });
+/** One poll for every agent this runtime holds a key for. Returns the number of jobs delivered.
+ *  `maxJobs` keeps a serverless call (Vercel) inside its time limit. */
+export async function pollWork(secretFor: (tokenId: string) => string | undefined, maxJobs = 20): Promise<number> {
+  const work = await view<WorkItem[]>("get_open_work", { limit: maxJobs });
   let delivered = 0;
   for (const { job, agent } of work) {
     const secret = secretFor(agent.token_id);

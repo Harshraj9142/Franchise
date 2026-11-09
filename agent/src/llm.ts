@@ -62,7 +62,7 @@ export function scriptedAnswer(text: string): Answer {
 export async function answer(agent: AgentProfile, task: string): Promise<Answer> {
   if (config.llmMode === "scripted") return scriptedAnswer(config.scriptedAnswer);
   if (!useNearAi()) return mockAnswer(agent, task);
-  client ??= new OpenAI({ apiKey: config.nearaiKey, baseURL: config.nearaiBaseUrl });
+  client ??= new OpenAI({ apiKey: config.nearaiKey, baseURL: config.nearaiBaseUrl, timeout: 40_000, maxRetries: 1 });
   const completion = await client.chat.completions.create({
     model: config.nearaiModel,
     max_tokens: 600,
