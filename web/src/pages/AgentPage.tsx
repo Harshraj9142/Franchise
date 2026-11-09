@@ -24,7 +24,7 @@ export function AgentPage({ tokenId }: { tokenId: string }) {
       return { agent, vault, keys, jobs, history, config };
     },
     [tokenId],
-    3000,
+    5000,
   );
 
   if (error && !data) return <p className="error">Could not load agent #{tokenId}: {error}</p>;

@@ -1,15 +1,31 @@
-import { CONTRACT, RPC_URL } from "./config";
+import { CONTRACT, RPC_URLS } from "./config";
 
+let preferred = 0;
+
+/**
+ * JSON-RPC with failover: if an endpoint is unreachable, blocked or rate-limited,
+ * the next one is tried and remembered. Contract errors are returned as-is.
+ */
 async function rpc<T>(method: string, params: unknown): Promise<T> {
-  const res = await fetch(RPC_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: "franchise", method, params }),
-  });
-  const body = await res.json();
-  if (body.error) throw new Error(body.error.data ?? body.error.message ?? "RPC error");
-  if (body.result?.error) throw new Error(body.result.error);
-  return body.result as T;
+  const payload = JSON.stringify({ jsonrpc: "2.0", id: "franchise", method, params });
+  let lastError: unknown;
+  for (let i = 0; i < RPC_URLS.length; i++) {
+    const idx = (preferred + i) % RPC_URLS.length;
+    let body;
+    try {
+      const res = await fetch(RPC_URLS[idx], { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+      if (res.status === 429 || res.status >= 500) throw new Error(`RPC ${res.status}`);
+      body = await res.json();
+    } catch (e) {
+      lastError = e;
+      continue;
+    }
+    preferred = idx;
+    if (body.error) throw new Error(body.error.data ?? body.error.message ?? "RPC error");
+    if (body.result?.error) throw new Error(body.result.error);
+    return body.result as T;
+  }
+  throw lastError instanceof Error ? lastError : new Error("no RPC endpoint reachable");
 }
 
 const enc = (o: unknown) => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o))));

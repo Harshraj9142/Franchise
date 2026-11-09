@@ -17,8 +17,14 @@ export function usePoll<T>(load: () => Promise<T>, deps: unknown[], ms = 4000) {
   useEffect(() => {
     setData(undefined);
     refresh();
-    const t = setInterval(refresh, ms);
-    return () => clearInterval(t);
+    // Don't poll the RPC from background tabs; catch up as soon as the tab is visible again.
+    const t = setInterval(() => document.visibilityState === "visible" && refresh(), ms);
+    const onVisible = () => document.visibilityState === "visible" && refresh();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return { data, error, refresh };
