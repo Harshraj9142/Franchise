@@ -5,6 +5,7 @@ Franchise turns an AI agent into an asset you can own and sell. Each NFT is tied
 Built at NEAR HACKATHON (November 2026). Tracks: NFTs That Do Something, Agent Economy, Autonomous Business.
 
 - Live demo: https://harshraj9142.github.io/Franchise/ (NEAR testnet)
+- Agent runtime: https://franchise-sooty.vercel.app (Vercel)
 - Contract: [`franchise.harshraj9142.testnet`](https://testnet.nearblocks.io/address/franchise.harshraj9142.testnet)
 - Demo video: _add the X post link here_
 
@@ -107,11 +108,21 @@ Where the runtime's keys live:
 - **Local mode:** random keys in `.operators.json`, which is git-ignored.
 - **Hosted mode:** set `OPERATOR_MASTER_SEED` (generate it with `openssl rand -hex 32`). Every agent's key is then derived from that one secret with HMAC-SHA256, so the runtime keeps no files and survives restarts.
 
-**Agent runtime, hosted.** `agent/Dockerfile` runs on any container host that keeps a process running. A free tier that sleeps when idle, like Render's free plan, would stop answering jobs. On Railway:
+**Agent runtime, hosted on Vercel (what the live demo uses).** `agent/api/` holds serverless functions, so the runtime needs no always-on server:
 
-1. New Project → Deploy from GitHub repo → this repo, with **Root Directory** set to `agent`.
-2. Add variables: `NEAR_NETWORK=testnet`, `FRANCHISE_CONTRACT=franchise.<name>.testnet`, `OPERATOR_MASTER_SEED`, and optionally `NEARAI_API_KEY`.
-3. Networking → Generate Domain. Check that `https://<domain>/health` answers `ok`.
+- `GET /api/health` is a liveness check.
+- `GET /api/operator/<token_id>` returns the public key a holder registers.
+- `GET /api/work` answers up to 3 open jobs and returns `{"delivered": n}`.
+
+The web app calls `/api/work` while a job is open. `.github/workflows/runtime-tick.yml` also calls it every 5 minutes, for jobs hired some other way.
+
+1. Vercel → Add New → Project → import this repo, with **Root Directory** set to `agent` and **Framework Preset** set to Other. `agent/vercel.json` covers the rest.
+2. Add environment variables for Production: `NEAR_NETWORK=testnet`, `FRANCHISE_CONTRACT=franchise.<name>.testnet`, `OPERATOR_MASTER_SEED`, and optionally `NEARAI_API_KEY`. Redeploy after adding them.
+3. Check that `https://<project>.vercel.app/api/operator/1` returns a key. Then set the repository variable `VITE_RUNTIME_URL` to `https://<project>.vercel.app/api` (see the web app steps below).
+
+The live runtime is at https://franchise-sooty.vercel.app.
+
+**Agent runtime, as a long-running process.** `npm start` (or `agent/Dockerfile`) polls the chain every few seconds, on any host that keeps a process running, such as Railway or Fly. A free tier that sleeps when idle, like Render's free plan, would stop answering jobs. Set the same variables plus `PORT`; it then serves `/health` and `/operator/<token_id>`.
 
 **Web app.** `.github/workflows/pages.yml` builds `web/` and publishes it to GitHub Pages on every push to `main`:
 
@@ -140,10 +151,10 @@ On testnet the deployer keeps a full-access key on `franchise.<name>.testnet` so
 | `contracts/franchise` | NFT contract, job escrow, royalties, holder controls, views (`src/lib.rs`, `src/views.rs`), unit tests (`src/tests.rs`) |
 | `contracts/vault` | The contract on each agent's own account, with its unit tests |
 | `integration-tests/tests/franchise.rs` | 13 end-to-end tests on a local NEAR sandbox, one per threat plus the combined views |
-| `agent/` | TypeScript runtime: `npm start` (worker), `npm run keygen`, `npm run hire-agent`, `npm run demo:local`, `npm test`; `Dockerfile` for hosting |
+| `agent/` | TypeScript runtime: `npm start` (worker), `npm run keygen`, `npm run hire-agent`, `npm run demo:local`, `npm test`; `api/` serverless functions for Vercel; `Dockerfile` for long-running hosts |
 | `web/` | Vite + React app: market, agent pages, owner panel |
 | `scripts/` | `build.sh`, `deploy-testnet.sh` |
-| `.github/workflows/` | `test.yml` runs every test on each push; `pages.yml` publishes the web app |
+| `.github/workflows/` | `test.yml` runs every test on each push; `pages.yml` publishes the web app; `runtime-tick.yml` calls the hosted runtime every 5 minutes |
 | `res/` | Built wasm. `vault.wasm` is embedded into `franchise.wasm` at build time. |
 
 ## Known limitations
