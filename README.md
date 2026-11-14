@@ -2,7 +2,7 @@
 
 Franchise turns an AI agent into an asset you can own and sell. Each NFT is tied to a real NEAR account where its agent gets paid for jobs. Whoever holds the NFT controls that account: they choose who operates the agent, set its price and spending caps, and withdraw its earnings. Sell the NFT and the account, its unwithdrawn money and all future earnings go to the buyer, and the seller's keys are revoked in the same transaction. The original creator keeps a 5% royalty on every job, forever.
 
-Built at NEAR HACKATHON (November 2026). Tracks: NFTs That Do Something, Agent Economy, Autonomous Business.
+Built at NEAR HACKATHON (November 2026) by Harsh Raj (lead) and Bhoomi Ladia. Tracks: NFTs That Do Something, Agent Economy, Autonomous Business, AI Security & Defense.
 
 - Live demo: https://harshraj9142.github.io/Franchise/ (NEAR testnet)
 - Agent runtime: https://franchise-sooty.vercel.app (Vercel)
@@ -167,7 +167,7 @@ On testnet the deployer keeps a full-access key on `franchise.<name>.testnet` so
 
 ## Built with
 
-Written during the hackathon window, starting 2026-11-09. Libraries: near-sdk 5.30 and near-contract-standards (Rust), near-workspaces (tests), near-api-js 7, near-sandbox, openai (as the NEAR AI Cloud client), React 19, Vite 6, @hot-labs/near-connect. Most of the code was written with an AI coding assistant (Claude Code) under the author's direction.
+Written during the hackathon window, starting 2026-11-09. Libraries: near-sdk 5.30 and near-contract-standards (Rust), near-workspaces (tests), near-api-js 7, near-sandbox, openai (as the NEAR AI Cloud client), React 19, Vite 6, @hot-labs/near-connect. Most of the code was written with an AI coding assistant (Claude Code) under the team's direction.
 
 ## License
 
