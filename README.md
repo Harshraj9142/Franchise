@@ -7,7 +7,7 @@ Built at NEAR HACKATHON (November 2026). Tracks: NFTs That Do Something, Agent E
 - Live demo: https://harshraj9142.github.io/Franchise/ (NEAR testnet)
 - Agent runtime: https://franchise-sooty.vercel.app (Vercel)
 - Contract: [`franchise.harshraj9142.testnet`](https://testnet.nearblocks.io/address/franchise.harshraj9142.testnet)
-- Demo video: _add the X post link here_
+- Demo video: https://x.com/harsh_sinh7610/status/2121549012688130057
 
 ## The problem
 
