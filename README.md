@@ -167,7 +167,7 @@ On testnet the deployer keeps a full-access key on `franchise.<name>.testnet` so
 
 ## Built with
 
-Written during the hackathon window, starting 2026-11-09. Libraries: near-sdk 5.30 and near-contract-standards (Rust), near-workspaces (tests), near-api-js 7, near-sandbox, openai (as the NEAR AI Cloud client), React 19, Vite 6, @hot-labs/near-connect. Most of the code was written with an AI coding assistant (Claude Code) under the team's direction.
+Designed and built by Harsh Raj and Bhoomi Ladia during the hackathon window, starting 2026-11-09. Much of the code was written with an AI coding assistant (Claude Code) under our direction, as the hackathon rules allow. Libraries: near-sdk 5.30 and near-contract-standards (Rust), near-workspaces (tests), near-api-js 7, near-sandbox, openai (as the NEAR AI Cloud client), React 19, Vite 6, @hot-labs/near-connect.
 
 ## License
 
