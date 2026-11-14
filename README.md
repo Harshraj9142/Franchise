@@ -53,6 +53,7 @@ license: MIT
 - [TL;DR for reviewers](#tldr-for-reviewers)
 - [The problem](#the-problem)
 - [The idea in one picture](#the-idea-in-one-picture)
+- [Why would anyone buy an agent?](#why-would-anyone-buy-an-agent)
 - [See it working](#see-it-working)
 - [Try it in 3 commands](#try-it-in-3-commands-node-only)
 - [Every claim, and where it is proven](#every-claim-and-where-it-is-proven)
@@ -63,6 +64,7 @@ license: MIT
 - [Tests](#tests)
 - [Repository layout](#repository-layout)
 - [Known limitations](#known-limitations)
+- [Roadmap](#roadmap)
 - [Disclosures](#disclosures)
 
 ## The problem
@@ -89,6 +91,26 @@ flowchart LR
 3. **Hire.** A client pays for a task. The money waits in escrow.
 4. **Deliver.** The AI answers with a private model on NEAR AI Cloud. The agent's account gets 95% and the creator gets 5%.
 5. **Sell.** The NFT changes hands. In the same transaction the old key is deleted and the agent pauses, so the buyer gets the account, its balance and every future job.
+
+## Why would anyone buy an agent?
+
+**What the buyer gets.** Not just a prompt, but a running business with a verifiable past:
+
+- **The account and its money.** Unwithdrawn earnings move with the NFT.
+- **A track record anyone can check.** Every job, answer, payment and change of hands is on-chain (`get_agent_page`, `get_history`), so a buyer can see what the agent earned before paying for it.
+- **Its clients and every future job.** Clients hire the agent by its NFT, so they keep coming after the sale and pay the new holder.
+- **Safe control from the first block.** The seller's key is gone in the same transaction, and a second lock rejects anything signed for an older holder, so the buyer doesn't have to trust the seller.
+
+**"Can't I just copy the skill prompt?"** Today, yes. In this version the skill is public on purpose, so clients can see what they hire. What can't be copied is the account's balance, its job history and the clients who already use it. Private skills are the first item on the [roadmap](#roadmap).
+
+**"NFTs that own accounts already exist."** Token-bound accounts (ERC-6551) let an NFT own an account on Ethereum. Franchise adds what an AI business needs, using NEAR's native account model:
+
+- a key the AI can work with but can never withdraw with;
+- revoked automatically, in the same transaction, on every transfer path, including marketplace sales;
+- a second, epoch-based lock in case that revocation fails;
+- a creator royalty on the agent's cash flow.
+
+**"Who runs the AI?"** The holder chooses. One click activates the hosted runtime, or the holder registers the key of a runtime they run themselves. Either way, the runtime can deliver work and can't move money.
 
 ## See it working
 
@@ -486,6 +508,21 @@ On testnet the deployer keeps a full-access key on `franchise.<name>.testnet` so
 - Public RPCs rate-limit per IP (FastNEAR allowed about 1 request per second in testing). The web app uses one combined view per screen (`get_market`, `get_agent_page`) and falls back to NEAR's public RPC. The runtime makes one `get_open_work` call per poll, however many agents it serves.
 - `hire_agent` is triggered by the operator, not decided autonomously from task text, to avoid prompt-injected spending.
 - A seller can spend up to the daily `hire_agent` cap just before a sale. Buyers can see every hire in the history.
+- There are no ratings or disputes yet. A client's protection is the escrow and the refund after the timeout.
+
+## Roadmap
+
+None of this is built yet. It is what we would do next, in this order.
+
+1. **Private skills.** Store the skill prompt encrypted and decrypt it only inside NEAR AI's TEE, so a buyer gets an agent that can't be copied, and the creator's know-how stays private.
+2. **Reputation and disputes.** Let clients rate each job on-chain, and add an optional review window before payout, so buyers can price an agent by its quality as well as its earnings.
+3. **A marketplace view.** List agents for sale with their earnings history, job count and rating as the listing's stats. Approved marketplace sales already rotate control (NEP-178).
+4. **Autonomous subcontracting.** Let an agent decide from the task itself to hire other agents, still inside the holder's per-transaction and daily caps. Today the operator triggers `hire_agent`, to avoid prompt-injected spending.
+5. **Mainnet.**
+   - Create agents through NEP-591 global contracts, cutting the cost from about 1.8 NEAR to about 0.4 NEAR.
+   - Get an audit.
+   - Delete the deployer's full-access key so the code is immutable.
+   - Move history and job lists to an indexer fed by the NEP-297 events.
 
 ## Disclosures
 
