@@ -18,12 +18,44 @@ Built at NEAR HACKATHON (November 2026) by Harsh Raj (lead) and Bhoomi Ladia. Tr
 
 ![The Franchise market: agents for hire, each one an NFT that owns a NEAR account](docs/screenshots/market.png)
 
+## TL;DR for reviewers
+
+```yaml
+project: Franchise
+one_liner: >
+  Each NFT owns a real NEAR account where its AI agent earns. Sell the NFT and the
+  account, its money and all future earnings move to the buyer; the seller's key is
+  revoked in the same transaction; the creator keeps a 5% royalty on every job, forever.
+tracks: [NFTs That Do Something, Agent Economy, Autonomous Business, AI Security & Defense]
+team: [Harsh Raj (lead), Bhoomi Ladia]
+verify:
+  requires: [node>=22]            # prebuilt wasm in res/: no Rust, no keys, no NEAR account
+  commands: ["cd agent && npm install", "npm run demo:local", "npm test"]
+  runtime: about 10 seconds for the demo, on a local NEAR node (real neard via near-sandbox)
+  pass_signal: "demo:local exits 0 and prints 'Done.'; npm test prints '# pass 7' and '# fail 0'"
+  key_lines:
+    - "vault earned 0.095 NEAR · creator royalty 0.005 NEAR"
+    - "alice's operator key still active? false"
+    - "alice: rejected (only the current holder)"
+  contract_tests: "cargo test: 14 unit + 13 sandbox tests (needs Rust 1.95 and cargo-near)"
+live:
+  app: https://harshraj9142.github.io/Franchise/
+  runtime: https://franchise-sooty.vercel.app/api/health
+  contract: franchise.harshraj9142.testnet (NEAR testnet, 10 agents)
+  video: https://x.com/harsh_sinh7610/status/2121549012688130057
+security: THREAT_MODEL.md lists 9 seller attacks, each with the test that covers it
+pre_hackathon_code: none (first commit 9 Nov 2026)
+license: MIT
+```
+
 ## Contents
 
+- [TL;DR for reviewers](#tldr-for-reviewers)
 - [The problem](#the-problem)
 - [The idea in one picture](#the-idea-in-one-picture)
 - [See it working](#see-it-working)
-- [Try it in 3 commands](#try-it-in-3-commands-no-near-account-needed)
+- [Try it in 3 commands](#try-it-in-3-commands-node-only)
+- [Every claim, and where it is proven](#every-claim-and-where-it-is-proven)
 - [How it works](#how-it-works)
 - [Security: what stops a seller](#security-what-stops-a-seller)
 - [What NEAR enables here](#what-near-enables-here)
@@ -31,7 +63,7 @@ Built at NEAR HACKATHON (November 2026) by Harsh Raj (lead) and Bhoomi Ladia. Tr
 - [Tests](#tests)
 - [Repository layout](#repository-layout)
 - [Known limitations](#known-limitations)
-- [Built with](#built-with)
+- [Disclosures](#disclosures)
 
 ## The problem
 
@@ -64,6 +96,10 @@ flowchart LR
 
 <p align="center"><b><a href="https://x.com/harsh_sinh7610/status/2121549012688130057">▶ Watch the 2-minute demo</a></b>: mint, activate, hire, a real NEAR AI answer, sale and withdrawal, all live on testnet.</p>
 
+**Hire to answer, live on testnet.** A client hires Pocket Poet, the price waits in escrow, and a few seconds later the answer from NEAR AI Cloud is stored on-chain and paid out (1.5× speed; chain waits sped up further).
+
+<p align="center"><img src="docs/screenshots/hire-to-answer.gif" alt="A client hires the agent, the job shows 'working', then a haiku from Qwen on NEAR AI Cloud appears" width="760"></p>
+
 **1. Launch an agent.** One form: a name, a skill prompt and a price per job. Minting creates the agent's own NEAR account.
 
 <p align="center"><img src="docs/screenshots/launch.png" alt="The launch form: name, skill and price per job" width="560"></p>
@@ -93,14 +129,21 @@ flowchart LR
   </tr>
 </table>
 
-## Try it in 3 commands (no NEAR account needed)
+## Try it in 3 commands (Node only)
 
-Requirements: Rust (the repo pins 1.95 via `rust-toolchain.toml`), [cargo-near](https://github.com/near/cargo-near) (`cargo install --locked cargo-near`), Node 22+.
+Needs **Node 22+** only. The built contracts are committed in `res/`, so there is no Rust, no wallet and no NEAR account to set up. A real local NEAR node is started for you by `near-sandbox`.
 
 ```bash
-./scripts/build.sh                     # builds res/vault.wasm and res/franchise.wasm
-cargo test                             # 14 unit tests + 13 tests on a local NEAR sandbox
-cd agent && npm install && npm run demo:local
+cd agent && npm install
+npm run demo:local      # about 10 s: the whole story on a local NEAR node, exits 0
+npm test                # 7 runtime tests: "# pass 7", "# fail 0"
+```
+
+To rebuild the contracts and run their 27 tests, you also need Rust (the repo pins 1.95 via `rust-toolchain.toml`) and [cargo-near](https://github.com/near/cargo-near) (`cargo install --locked cargo-near`):
+
+```bash
+./scripts/build.sh      # rebuilds res/vault.wasm and res/franchise.wasm
+cargo test              # 14 unit tests + 13 tests on a local NEAR sandbox
 ```
 
 What you should see from `npm run demo:local`. It starts a local NEAR node and runs the whole story with the real contracts and the real agent runtime:
@@ -124,6 +167,40 @@ cd web && npm install && VITE_RPC_URL=<printed url> VITE_CONTRACT=franchise.sand
 ```
 
 Open http://localhost:5173. You'll see three agents, their jobs and results, each NFT's account, its live access keys and its history. Wallet actions need testnet (below), because wallets can't connect to a local node.
+
+## Every claim, and where it is proven
+
+Sandbox tests are in [`integration-tests/tests/franchise.rs`](integration-tests/tests/franchise.rs); unit tests (*unit*) are in `contracts/*/src`; demo steps refer to `npm run demo:local` above.
+
+| # | Claim | Proof |
+| --- | --- | --- |
+| 1 | Minting creates a real NEAR account for the NFT, with no full-access key | `mint_creates_vault_and_nft`, `vault_has_only_function_call_keys` · demo step 1 |
+| 2 | The AI runtime's key can deliver work but can't move money | `vault_has_only_function_call_keys`, `vault_rejects_direct_calls` · demo step 2 · live command below |
+| 3 | A job's price waits in escrow; on delivery 95% goes to the agent's account and 5% to the creator | `full_job_flow_pays_vault_and_creator_royalty`, *unit* `settle_from_current_epoch_pays_vault_and_creator` · demo step 4 |
+| 4 | A sale revokes the seller's key and pauses the agent in the same transaction | `transfer_revokes_operator_key`, *unit* `transfer_bumps_epoch_and_pauses`, `transfer_clears_operator_and_pauses` · demo step 5 |
+| 5 | Even if the key deletion fails, a stale operator can't get paid or spend | *unit* `settle_rejects_vault_with_stale_epoch`, `hire_from_vault_with_stale_epoch_rejected` |
+| 6 | The seller can't withdraw after the sale, or race it | `withdraw_racing_a_sale`, *unit* `withdraw_with_old_epoch_rejected`, `withdraw_to_previous_holder_rejected` · demo step 7 |
+| 7 | The buyer gets the balance and every future job | `buyer_resumes_and_withdraws_everything` · demo steps 5 to 7 |
+| 8 | Marketplace sales rotate control too | `approvals_cleared_on_transfer_and_marketplace_sale_syncs_vault` |
+| 9 | Only the agent's own account can settle its jobs | `only_own_vault_can_settle`, *unit* `lookalike_account_is_not_a_vault`, `other_vault_cannot_settle` |
+| 10 | Holder actions need a full-access key (1 yoctoNEAR), so a dApp's limited key can't withdraw | `holder_methods_need_one_yocto` |
+| 11 | Agents can hire agents, only within the holder's caps | `hire_agent_respects_caps` |
+| 12 | An undelivered job is refunded, and a job can never pay out twice | `cancel_after_timeout_and_no_double_payout` |
+| 13 | Out-of-order transfer messages can't roll control back | *unit* `older_transfer_message_rejected` |
+| 14 | A holder can never withdraw the account's storage reserve | *unit* `withdraw_keeps_storage_and_reserve` |
+| 15 | One view call per screen returns the same data as the individual views | `combined_views_match_individual_views` |
+| 16 | On testnet, answers come from a private model on NEAR AI Cloud, named in each result | live command below · the agent pages of the live demo |
+
+Check it live on testnet:
+
+```bash
+# Agent 1's account has exactly one key, and it can only call complete_job and hire_agent
+near account list-keys agent-1.franchise.harshraj9142.testnet network-config testnet now
+
+# Agent 10's job result, written by Qwen on NEAR AI Cloud, with the model and request id
+near contract call-function as-read-only franchise.harshraj9142.testnet get_agent_page \
+  json-args '{"token_id":"10"}' network-config testnet now
+```
 
 ## How it works
 
@@ -410,9 +487,19 @@ On testnet the deployer keeps a full-access key on `franchise.<name>.testnet` so
 - `hire_agent` is triggered by the operator, not decided autonomously from task text, to avoid prompt-injected spending.
 - A seller can spend up to the daily `hire_agent` cap just before a sale. Buyers can see every hire in the history.
 
-## Built with
+## Disclosures
 
-Designed and built by Harsh Raj and Bhoomi Ladia during the hackathon window, starting 2026-11-09. Much of the code was written with an AI coding assistant (Claude Code) under our direction, as the hackathon rules allow. Libraries: near-sdk 5.30 and near-contract-standards (Rust), near-workspaces (tests), near-api-js 7, near-sandbox, openai (as the NEAR AI Cloud client), React 19, Vite 6, @hot-labs/near-connect.
+- **Built during the hackathon.** Designed and built by Harsh Raj and Bhoomi Ladia during the hackathon window, starting 2026-11-09 (first commit), after the 19 Oct announcement. There is no pre-hackathon code, and Franchise is not an existing product on another chain.
+- **AI.** Much of the code was written with an AI coding assistant (Claude Code) under our direction, as the hackathon rules allow.
+- **Third-party code.** No templates or boilerplate. Libraries: near-sdk 5.30 and near-contract-standards (Rust), near-workspaces (tests), near-api-js 7, near-sandbox, openai (as the NEAR AI Cloud client), React 19, Vite 6, @hot-labs/near-connect.
+
+### What is real and what is demo-only
+
+| | |
+| --- | --- |
+| **Real** | The contracts on NEAR testnet (`franchise.harshraj9142.testnet`, 10 agents, every transaction on nearblocks). Answers from a private model on NEAR AI Cloud (`Qwen/Qwen3.6-35B-A3B-FP8`), delivered by the runtime on Vercel and stored on-chain with their request ids. |
+| **Demo-only** | `npm run demo:local` runs on a local NEAR node and, without `NEARAI_API_KEY`, uses a mock model that labels its answers as mock. The demo video signs with local testnet keys through a "Testnet demo wallet" added for the recording; the app itself connects real wallets through NEAR Connect. |
+| **Not yet** | Mainnet. An audit. The NEP-591 global-contract path is built but untested on testnet. On testnet the deployer keeps a full-access key on the franchise account so it can be redeployed (see [Locking the contract](#locking-the-contract-production)). |
 
 ## License
 
